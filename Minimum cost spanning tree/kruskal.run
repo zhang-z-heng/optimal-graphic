@@ -1,0 +1,56 @@
+# Kruskal's algorithm for the Minimum Spanning Tree (MST) problem
+reset;
+model kruskal.mod;
+data graph.dat;
+
+repeat
+{  
+  let MinCostEdges := {(i,j) in F: c[i,j] == min{(u,v) in F} c[u,v]};
+  
+  let F := F diff MinCostEdges;
+  
+  for {(i,j) in MinCostEdges} 
+  {
+    printf "Testing edge (%d,%d)\n",i,j; 
+    if cc[i] == 0 then 
+    {
+    	if cc[j] == 0 then 
+      	{
+      		# Case 1: neither vertex is in the tree. 
+        	# Start a new component with (i,j).
+	 		let cc[i] := max{v in N} cc[v] + 1;
+	 		let cc[j] := cc[i];
+	 		let T := T union {(i,j)};
+      	} 
+      	else
+      	{
+      		# Case 2: j is in the tree, but i isn't.
+        	# Add (i,j) to the component containing j
+	 		let cc[i] := cc[j];
+	 		let T := T union {(i,j)};
+      	}
+    }
+    else
+    {
+    	if cc[j] == 0 then
+      	{
+        	# Case 3: i is in the tree, but j isn't.
+        	# Add (i,j) to the component containing i
+	 		let cc[j] := cc[i];
+	 		let T := T union {(i,j)};
+      	}
+      	else if cc[i] <> cc[j] then
+      	{
+			# Case 4: i and j are in different connected components; merge the components;
+        	for {v in N: cc[v] == cc[j]} let cc[v] := cc[i];
+			let T := T union {(i,j)};
+      	}
+      	else
+      		printf "Adding edge (%d,%d) would create a cycle.\n\n",i,j;
+    }
+    display T;
+  }
+} while (card(T) < n - 1);
+
+printf "A minimum MST has cost %d. Computation time %f\n",sum{(i,j) in T} c[i,j], _ampl_user_time;
+
