@@ -1,0 +1,95 @@
+
+
+reset;
+
+model master.mod;
+
+model pricing.mod;
+
+data multicommodity.dat;
+
+
+problem master:  x, PathCost, PathBalance, PathCapacity; 
+
+problem pricing: z, ShortestPath, NodeBalance;
+
+
+param iter default 0;        # Number of iterations
+param flag default 0;        # At least a new column
+
+# Compute the cost of the initial set of paths
+let {p in P} cp[p] := sum {(i,j) in Path[p]} c[i,j];
+
+
+repeat {   
+   let iter := iter + 1;
+   problem master;
+   option solver 'cplex';
+   solve master;
+
+   printf "\nIter %d: Master %.3f\n\n", iter, PathCost;
+  printf"\n Used paths: \n";
+  for{p in 1..n_p}{
+	if(x[p] > 0) then{
+	for {(i,j) in Path[p]}
+              printf "(%d,%d) ", i, j;
+           printf "%f, ", x[p];
+	   printf " - rc %f \n", x[p].rc; 
+	}
+	else{
+	   printf "( Not Used ";
+	   for {(i,j) in Path[p]}
+              printf "(%d,%d) ", i, j;
+           printf "%f", x[p];
+	   printf " - rc %f )\n", x[p].rc; 
+
+	}
+  }
+   printf"\n\n";
+
+   # Use the dual variables to set the cost function of the pricing subproblem	
+   let {(i,j) in A} g[i,j] := c[i,j] - PathCapacity[i,j].dual;
+   let {k in K} sigma[k]   := PathBalance[k].dual;
+   display sigma;
+
+   let flag := 0;
+
+   # Solve a pricing subproblem for each commodity
+   for {k in K} {
+       let source := s[k];
+       let target := t[k];
+		problem pricing;
+		option solver 'cplex';
+       solve pricing;
+
+	# Check the reduced cost	
+	printf "\n shortest path %d, sigma %d \n", ShortestPath, sigma[k];
+	if sigma[k] > ShortestPath then { 
+	   let n_p := n_p + 1;
+	   let Path[n_p] := {(i,j) in A: z[i,j] = 1}; 
+	   let cp[n_p] := sum {(i,j) in Path[n_p]} c[i,j];			
+	   let or[n_p] := s[k];
+	   let dest[n_p] := t[k];
+	   let flag := 1;
+	   printf "\t\t ReducedCost = %7.3f |", ShortestPath-sigma[k];
+	   for {(i,j) in Path[n_p]}
+              printf "(%d,%d) ", i, j;
+           printf "\n\n\n";
+	}
+   }
+   printf "----------------------------------------\n\n";
+} until (flag = 0 || iter > 100) ;
+
+problem master;
+solve master;
+
+printf "\n\n Master Obj = %7.3f\n", PathCost;
+printf"\nUsed paths: \n";
+for{p in 1..n_p}{
+	if(x[p] > 0) then{
+	for {(i,j) in Path[p]}
+              printf "(%d,%d) ", i, j;
+           printf "%f, \n", x[p];
+	}
+}
+display x;

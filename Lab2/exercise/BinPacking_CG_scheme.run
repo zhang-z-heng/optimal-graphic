@@ -1,0 +1,118 @@
+
+reset;
+model BinPacking_CG.mod;
+data instanceBP_1.dat;
+
+problem master;
+option solver "cplex";
+
+problem pricing;
+option solver "cplex";
+
+#auxiliary parameters
+param flag default 0;
+param max_iter default 100;
+
+#initial solution
+
+let S:= N;
+
+for{i in 1..N}{
+	
+	let a[i,i] := 1;
+
+}
+
+for{counter in 1 .. max_iter} 
+{    
+	#reset flag
+	let flag := 0;
+
+	      
+    #solve the current master problem  
+	solve master;
+
+	
+	#print the optimal objective value of the current master problem
+	#...
+	#...
+	#...
+
+
+	#set the profit of each item equal to
+	#the corresponding dual variable of the current master problem	
+	#...
+	#...
+	#...
+	
+		
+	#solve the current pricing problem
+	solve pricing;
+	
+	
+	#print the cluster selected by the current pricing problem	
+	#...
+	#...
+	#...
+	
+	
+	#print the profit of the candidate new cluster
+	#...
+	#...
+	#...
+	
+	
+	#check if the candidate new cluster makes the current dual solution infeasible
+	if  (profit <= 1) then
+	{
+		#current master problem solution optimal -> set flag to 0	
+		let flag:=0;
+				
+		#terminate the column generation procedure
+		break;
+	}
+	else
+	{		
+		#add the candidate new cluster (column/variable) to the master problem				
+		let S:=S+1;	    			
+		#...
+		#...
+		#...
+	
+		 	
+	 	#print the current number of clusters in the master problem
+		#...
+		#...
+		#...
+	
+		
+		#current master problem solution not optimal -> set flag to 1	
+		#...
+		#...
+		#...
+
+	}
+}
+
+
+#solve the master problem with the final set of clusters (columns/variables)
+solve master;
+
+
+#print the optimal objective function value of the final master problem
+#...
+#...
+#...
+		
+			
+#print the number of columns (variables) of the final master problem	
+#...
+#...
+#...
+
+
+#check if the column generation procedure is forced to terminate
+#before finding the optimal solution 
+#...
+#...
+#...	
