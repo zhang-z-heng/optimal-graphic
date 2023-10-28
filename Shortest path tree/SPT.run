@@ -1,0 +1,32 @@
+
+reset;
+
+model SPT.mod;
+
+data SPT.dat;
+
+option solver 'cplex';
+
+solve;
+
+#display the shortest path from the source to all other nodes
+
+for{i in N : i<>s}
+{
+    printf"\n path to %d :", i;
+    
+    let index := i;
+    
+	repeat until index == s
+	{
+        for{(j,h) in A : h = index}
+        {
+            if(x[j,h] <> 0) then
+            {
+                printf"(%d,%d) ", j, index;
+                let index := j;
+            }
+        }
+    }
+}
+printf"\n";
