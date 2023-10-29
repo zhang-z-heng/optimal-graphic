@@ -1,0 +1,163 @@
+reset;
+
+# Select an ILP solver
+
+option solver cplex;
+
+model MRP_heuristic.mod;
+
+data MRP_10.dat;
+
+# define the LP relaxation
+problem SetCover: x, WeightedCover, EdgeCover;
+
+#current partial solution
+let C := {};
+# next vertex to be selected
+param v default first(P);
+# random parameter
+param r default 0;
+
+# cost of the LP relaxation of the MRP
+param continuousRel_cost default 0;
+# cost of the solution obtained with randomized rounding
+param randRound_cost default 0;
+
+
+
+#-------------------------------------------------------------------
+#					LP RELAXATION OF THE MRP
+#-------------------------------------------------------------------
+
+# solve the LP relaxation 
+solve SetCover;
+
+# determine cost of the LP relaxation
+let continuousRel_cost:= sum{i in N}c[i]*x[i];
+	
+#display the optimal solution of the continuous relaxation of the original problem
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"             Optimal solution of the LP relaxation of the MRP \n" > results.txt; 
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+display x > results.txt;
+#display cost of the optimal solution of relaxation of the original problem	
+display continuousRel_cost > results.txt;
+
+printf"\n" > results.txt;
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                           Initial values \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+display card(C) > results.txt;
+display card(U) > results.txt;
+display card(E) > results.txt;
+
+
+printf"\n" > results.txt;
+
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Randomized Rounding \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+#number of Randomized Rounding iterations
+param iter default 0;
+
+repeat{
+
+   let iter := iter + 1;
+   	
+   # Solve the LP relaxation
+   solve SetCover;
+   
+
+   printf"  					        Iteration %d \n",iter > results.txt;
+   printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+      
+   printf"\n" > results.txt;
+   
+   printf"Solved the current LP relaxation\n" > results.txt;
+   
+   display x > results.txt;
+       
+   display WeightedCover > results.txt;
+   
+      
+   # Put in the cover the vertices with x^*=1
+   let C := C union {setof {i in N: x[i] = 1} i};
+   
+   # Put in P the vertices with x^* fractionary
+   let P := setof {i in N: 0 < x[i] < 1} i;
+   
+   printf"Updated C and U:\n\n" > results.txt;
+		
+   display card(C) > results.txt;
+   
+   display card(U) > results.txt; 
+     
+   repeat{
+      	
+   	if card(P) = 0 then break;
+	
+	# select a random vertex v in P
+   	let v := member(int(Uniform(1,card(P))),P);
+	
+	# remove it from P
+   	let P := P diff {v};
+	
+	# generate a random value r between 0 and 1 
+   	let r := Uniform(0,1);
+   	
+   	printf "Vertex %4d: prob=%f x=%f ", v, r, x[v] > results.txt;
+	
+	# add vertex v to the solution if x^*[v] > r
+   	if r <= x[v] then 
+   	{
+    	let C := C union {v};
+      	printf " -> added to the cover \n" > results.txt;	
+   	}
+   	else
+   		printf"\n" > results.txt;
+   	 
+   }while (card(P) > 0);
+   
+   fix {i in C} x[i] := 1;
+   
+   printf"\n" > results.txt;
+   
+   printf"Updated C and U:\n\n" > results.txt;
+   
+   display card(C) > results.txt;
+   
+   display card(U)  > results.txt;
+   
+
+   
+} while (card(U) > 1);
+
+printf"\n" > results.txt;
+
+printf"                      Final composition of C \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+if (card(U) == 1) then 
+{
+   printf"card(U)=1 -> adding the last vertex to C \n\n" > results.txt;
+   
+   for {(i,j) in U}
+   {
+   	 if (c[i]<=c[j]) then
+     	let C := C union {i};
+     else
+     	let C := C union {j};
+	}     
+}
+
+display card(C) > results.txt;
+
+display C > results.txt;;
+
+let randRound_cost := sum{i in C}c[i];
+
+printf"\n\n randomized rounding cost %f", randRound_cost > results.txt;

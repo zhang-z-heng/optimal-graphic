@@ -1,0 +1,227 @@
+reset;
+
+
+
+model MRP_scheme.mod;
+
+model MRP_greedy.mod;
+
+data MRP_10.dat;
+
+param iter default 0;
+
+param greedySol default 0;
+
+param time1 default 0;
+param time2 default 0;
+param time3 default 0;
+
+set maxCoveringNode;
+
+set bestCoveringNode;
+
+#current partial solution
+let C := {};
+
+display C;
+display F;
+display U;
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Greedy 1  \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+
+
+repeat{
+
+   let iter := iter + 1;
+   
+   printf"  					        Iteration %d \n",iter > results.txt;
+   printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+      
+   printf"\n" > results.txt;
+   
+   printf"Updated C:\n\n" > results.txt;
+   
+   for{i in C} printf"%d   ", i > results.txt; 
+   
+    printf"\n\nUpdated U:\n\n" > results.txt;
+   
+    for{(i,j) in U} printf"(%d, %d)   ", i,j > results.txt; 
+   
+   
+   let maxCoveringNode:= {i in (N diff C): degree[i] == max{j in (N diff C)} degree[j]};
+   
+   printf"\n\n Subset of best nodes:\n" > results.txt;  
+   
+   for{i in maxCoveringNode} printf"%d (%d)  ", i, degree[i] > results.txt;  
+   
+   printf"\n\n">results.txt;
+   for{i in maxCoveringNode}{
+   	
+   		let C := C union {i};
+   		
+   		let greedySol := greedySol + c[i];
+   		
+   		break;
+   
+   }
+
+  
+} while (card(U) >= 1);
+
+let time1 := _ampl_user_time;
+
+printf"\n" > results.txt;
+
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+printf"                      Greedy cost and solution \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+printf"\n Cost = %d\n", greedySol >results.txt;
+printf"Computational time %f\n", time1 > results.txt;
+
+printf"                      Final composition of C \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+
+
+display card(C) > results.txt;
+
+display C > results.txt;
+
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Greedy 2  \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+let C := {};
+let iter := 0;
+let greedySol := 0;
+
+repeat{
+
+   let iter := iter + 1;
+   
+   printf"  					        Iteration %d \n",iter > results.txt;
+   printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+      
+   printf"\n" > results.txt;
+   
+   printf"Updated C:\n\n" > results.txt;
+   
+   for{i in C} printf"%d   ", i > results.txt; 
+   
+    printf"\n\nUpdated U:\n\n" > results.txt;
+   
+    for{(i,j) in U} printf"(%d, %d)   ", i,j > results.txt; 
+   
+   let maxCoveringNode :={i in (N diff C): (degree[i]>0)};
+   let bestCoveringNode:= {i in maxCoveringNode: 
+   			(c[i]/degree[i] == min{j in maxCoveringNode} c[j]/degree[j])};
+   
+   printf"\n\n Subset of best nodes:\n" > results.txt;  
+   
+   for{i in bestCoveringNode} printf"%d (%g)  ", i, c[i]/degree[i] > results.txt;  
+   
+   printf"\n\n">results.txt;
+   for{i in bestCoveringNode}{
+   	
+   		
+   		let C := C union {i};
+   		
+   		let greedySol := greedySol + c[i];
+		break;
+  
+   }
+   
+} while (card(U) >= 1);
+
+let time2 := _ampl_user_time - time1;
+
+printf"\n" > results.txt;
+
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+printf"                      Greedy cost and solution \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+printf"\n Cost = %d\n", greedySol >results.txt;
+printf"Computational time %f\n", time2 > results.txt;
+
+printf"                      Final composition of C \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+
+
+display card(C) > results.txt;
+
+display C > results.txt;
+
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Greedy 3  \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+let C := {};
+let iter := 0;
+let greedySol := 0;
+
+repeat{
+
+   let iter := iter + 1;
+   
+   printf"  					        Iteration %d \n",iter > results.txt;
+   printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+      
+   printf"\n" > results.txt;
+   
+   printf"Updated C:\n\n" > results.txt;
+   
+   for{i in C} printf"%d   ", i > results.txt; 
+   
+    printf"\n\nUpdated U:\n\n" > results.txt;
+   
+    for{(i,j) in U} printf"(%d, %d)   ", i,j > results.txt; 
+   
+   let maxCoveringNode :={i in (N diff C): (degree[i]>0)};
+   let bestCoveringNode:= {i in maxCoveringNode: 
+   			(c[i] == min{j in maxCoveringNode} c[j])};
+   
+   printf"\n\n Subset of best nodes:\n" > results.txt;  
+   
+   for{i in bestCoveringNode} printf"%d (%g)  ", i, c[i] > results.txt;  
+   
+   printf"\n\n">results.txt;
+   for{i in bestCoveringNode}{
+   	
+   		
+   		let C := C union {i};
+   		
+   		let greedySol := greedySol + c[i];
+		break;
+  
+   }
+   
+} while (card(U) >= 1);
+
+let time3 := _ampl_user_time - time2 - time1;
+printf"\n" > results.txt;
+
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+printf"                      Greedy cost and solution \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+printf"\n Cost = %d\n", greedySol >results.txt;
+printf"Computational time %f\n", time3 > results.txt;
+
+printf"                      Final composition of C \n" > results.txt;
+printf"     ------------------------------------------------------------------- \n\n" > results.txt;
+
+
+
+display card(C) > results.txt;
+
+display C > results.txt;
+
+
