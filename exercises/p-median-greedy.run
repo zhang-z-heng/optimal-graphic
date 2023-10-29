@@ -1,0 +1,151 @@
+#option randseed 264306520444;
+#let {i in I, j in J} g[i,j] := int(Uniform(1,100));
+
+reset;
+model p-median-greedy.mod;
+data p-median-3.dat;
+
+#option solver './cplex';
+
+
+param time1 default 0;
+param time2 default 0;
+option solver cplex;
+
+#-------------------------------------------------------------------
+#					LP RELAXATION OF P-Median
+#-------------------------------------------------------------------
+
+# solve the LP relaxation 
+
+solve pmedian;
+
+
+#display the optimal solution of the continuous relaxation of the original problem
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"             Optimal solution of the LP relaxation of the p-median \n" > results.txt; 
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+display y > results.txt;
+display x >results.txt;
+#display cost of the optimal solution of relaxation of the original problem	
+display Cost > results.txt;
+display Cost;
+
+#------------------------------------------------------------------------
+#                       Greedy 1
+#------------------------------------------------------------------------
+
+# Open the first p facilities:
+# sorts the client-facility pairs based on the assignment cost 
+# starts opening the facility that provides the single minimum cost assignment
+param a_ij default 0; 
+repeat {
+
+  let a_ij := max{i in I, j in J} g[i,j];# maximum assignment cost;
+  for {j in CJ, i in CI} { #select the minimum cost pair
+     if g[i,j] <= a_ij then {
+        let si := i;
+        let sj := j;
+        let a_ij := g[i,j]; 
+     }
+  }
+  #open the selected facility and set the assignment
+  let CJ := CJ diff {sj};
+  let CI := CI diff {si};
+  let PI := PI union {si};
+  let PJ := PJ union {(si,sj)};
+} while ( card(PI) < p );
+
+# Assign greedly the remaining customers to the p open facilities 
+repeat {
+  let a_ij := max{i in PI, j in CJ} g[i,j];
+  for {j in CJ, i in PI} {
+     if g[i,j] <= a_ij then {
+        let si := i;
+        let sj := j;
+        let a_ij := g[i,j];
+     }
+  }
+  let CJ := CJ diff {sj};
+  let PJ := PJ union {(si,sj)};
+
+} while ( card(PJ) < m );
+
+let time1 := _ampl_user_time;
+
+printf "Greedy 1 cost: %d\n", sum{(i,j) in PJ} g[i,j];
+printf "Time %f \n", time1;
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Greedy 1 \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+printf" Selected facilities \t"> results.txt;
+for{i in PI} {printf "%d \t", i > results.txt;}
+printf"\n Selected assignment:\n" >results.txt;
+for{(i,j) in  PJ}
+	{printf" %d -> %d\t", i, j > results.txt;};
+printf"\n Cost: %f \n", sum{(i,j) in PJ} g[i,j] > results.txt;
+
+
+# Open the first p facilities
+# sorts the facilities based on the overal sum of the assignment costs
+#starts opening the facility that provides the minimum sum  of the assignment costs
+
+
+let PJ := {};
+let PI:= {};
+let CI:=I;
+let CJ := J;
+
+
+
+param totalg default 0; # minimum um of assignment costs
+
+
+repeat {
+
+let totalg := sum{i in I, j in J} g[i,j];
+
+  for {i in CI} {
+     if (sum{j in J} g[i,j] <= totalg) then {
+        let si := i;
+        let totalg := sum{j in J} g[i,j]; 
+     }
+  }
+  let CI := CI diff {si};
+  let PI := PI union {si};
+
+} while ( card(PI) < p );
+
+# Assign greedly the customers to the open facilities 
+repeat {
+  let a_ij := max{i in PI, j in CJ} g[i,j];
+  for {j in CJ, i in PI} {
+     if g[i,j] <= a_ij then {
+        let si := i;
+        let sj := j;
+        let a_ij := g[i,j];
+     }
+  }
+  let CJ := CJ diff {sj};
+  let PJ := PJ union {(si,sj)};
+} while ( card(PJ) < m );
+
+let time2 := _ampl_user_time - time1;
+
+ 
+printf "Greedy 2 cost: %d\n", sum{(i,j) in PJ} g[i,j];
+printf "Time %f\n", time2;
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   Greedy 2 \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n\n" > results.txt;
+
+printf" Selected facilities \t"> results.txt;
+for{i in PI} {printf "%d \t", i > results.txt;}
+printf"\n Selected assignment:\n" >results.txt;
+for{(i,j) in  PJ}
+	{printf" %d -> %d\t", i, j > results.txt;};
+printf"\n Cost: %f", sum{(i,j) in PJ} g[i,j] > results.txt;
+
