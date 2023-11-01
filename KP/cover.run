@@ -1,0 +1,161 @@
+
+reset;
+reset;
+
+model cover.mod;
+
+data KP_2.dat;
+
+option solver 'cplex';
+
+
+problem KnapsackRelax: x, Profit, Capacity, Cover;
+
+problem Separation: u, Violation, CoverCondition;
+
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 			    LP relaxation	                                \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+param initialSol default 0;
+param finalSol default 0;
+
+solve KnapsackRelax;
+let initialSol := Profit;
+display Profit > results.txt;
+
+
+printf"\n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 			Violated cover inequalities	        		        \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+param iter default 0;
+
+# Repeat until there are no violated cover inequalities
+repeat{
+
+   printf "----------------------------------- Iter: %d ---------------------------------\n", iter > results.txt;
+
+   # Update iterator 	
+   let iter := iter + 1;
+   
+   # Solve the LP relaxation with current set of cover inequalities 
+   solve KnapsackRelax;
+
+   printf "Profit=%.3f\n", Profit > results.txt;
+
+   # Prepare the objective function of the separation problem
+   let {i in I} x_star[i] := x[i];
+   
+   # Solve the separation problem
+   solve Separation;
+
+   printf "SEP=%.3f \n", Violation > results.txt;
+
+   # Check if a violated cover exists
+
+   if (Violation < 1) then 
+   {
+
+	  # Update the number of cover inequalities
+      let nc := nc + 1;
+
+      # Create new cover 
+      let CI[nc] := setof {i in I: u[i] = 1} i;
+
+      printf"CI[%d] := ",nc > results.txt;
+      for{j in CI[nc]}
+      {
+      	printf"%d ",j > results.txt;
+      }
+      printf"\n\n" > results.txt;
+
+   }
+
+} until ( Violation >= 1 );
+
+
+solve KnapsackRelax;
+let finalSol:=Profit;
+
+printf "Optimal values of x for LP with all violated cover inequalities:\n" > results.txt;
+
+display x > results.txt; 
+
+printf "Total number of cover inequalities considered: %d\n", nc > results.txt;
+
+
+printf"\n" > results.txt;
+printf"\n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 			Feasible integer solution	                		\n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+
+# Current set of items not yet considered for being added to the solution
+set items default I;
+
+# Current set of items added to the solution
+set selectedItems default {};
+
+# Value of current residual capacity
+param res_cap default B;
+
+# Value of current best ratio between profit and weight
+param best_ratio default 0;
+
+# Value of current feasible integer solution
+param obj default 0;
+
+ 
+repeat{
+
+  # Determine current best ratio between profit and weight	
+  let best_ratio := max{i in items} p[i]/w[i];
+  
+  for {i in I} 
+  {
+    	
+	if (p[i]/w[i] ==  best_ratio) then 
+	{
+	  	# Check if current most profitable item can fit the residual capacity
+		if(res_cap >= w[i]) then 
+		{
+			# Update the set of items in the solution 
+        	let selectedItems:= selectedItems union {i};
+        	# Update residual capacity
+			let res_cap := res_cap - w[i];
+			# Update value of feasible integer solution
+			let obj := obj + p[i];
+		}
+
+		# Remove currently considered item from set of unexplored items
+		let items := items diff {i};    
+    }    
+  }
+
+} while ( card(items) > 0 ); # repeat as long as there are unexplored items
+
+
+# Display final feasible integer solution
+printf"Selected items: " > results.txt;
+for{i in selectedItems} printf "%d ",i > results.txt;
+printf "\n" > results.txt;
+printf"Objective value: %.3f\n",obj > results.txt;
+
+
+printf"\n" > results.txt;
+printf"\n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"		                    Summary of results			  					    \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+printf"Feasible integer solution:  %.3f\nInitial LP relaxation:  %.3f\nFinal LP relaxation (with all violated cover inequalities):  %.3f \n",
+                        obj, initialSol, finalSol > results.txt;
+printf"Gap Initial LP relaxation:  %.3f %%\n",100*((initialSol-obj)/obj) > results.txt;
+printf"Gap Final LP relaxation (with all violated cover inequalities):  %.3f %%\n",100*((finalSol-obj)/obj) > results.txt;
