@@ -1,0 +1,284 @@
+
+reset;
+reset options;
+
+
+model relaxation.mod;
+
+data exTest12.dat;
+
+option solver 'cplex';
+
+
+problem OriginalKnapsack: x, OverallProfit, Capacity, Volume, Budget;
+
+problem LagrangianRelaxation: x, LR_objective;
+
+problem SurrogateRelaxation: x, OverallProfit, SurrogateCapacity;
+
+problem kOptNeighborhood: x, OverallProfit, Capacity, Volume, Budget, NeighbourhoodSize;
+
+param MAXITER := 1000;
+param tic;
+param toc;
+param LR_time;
+param SR_time;
+param greedy_time;
+param kopt_time;
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 Lagrangian Relaxation	                            \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+# Initialize the Lagrangian Relaxation
+
+param LB_LR default 0;
+display LB_LR > results.txt;
+
+param UB_LR default sum{i in I}p[i];
+display UB_LR > results.txt;
+
+param norma default 1;
+
+let t := 1;
+
+let tic := _ampl_user_time;
+
+for {iter in 1..MAXITER} 
+{
+  printf"\n\nIteration %d ... \n",iter > results.txt;
+  
+  solve LagrangianRelaxation;
+  
+  # Check for feasibility
+  if ( (sum {i in I} w[i]*x[i] <= B1) && (sum {i in I} q[i]*x[i] <= B2) && (sum {i in I} c[i]*x[i] <= B3) ) then
+  {
+    # Update lower bound 
+  	let LB_LR := max(LB_LR, sum{i in I} p[i]*x[i]);
+  	printf"\n Improving feasible solution found - value: %g", LB_LR > results.txt;
+
+  }
+
+  # Update step size
+  	let t := 0.995*t;
+ 
+  # Update upper bound
+  let UB_LR := min(UB_LR, LR_objective);  
+  printf"\n Current best upper bound %g",UB_LR > results.txt;
+
+  # Update multipliers
+  let u1_old := u1;
+  let u2_old := u2;
+  let u3_old := u3;
+  
+  let norma := sqrt((B1 - sum{i in I} w[i]*x[i])^2 + (B2 - sum{i in I} q[i]*x[i])^2 + (B3 - sum{i in I} c[i]*x[i])^2);
+
+  let u1 := max(0, u1_old - t * (B1 - sum{i in I} w[i]*x[i])/norma);
+  let u2 := max(0, u2_old - t * (B2 - sum{i in I} q[i]*x[i])/norma);
+  let u3 := max(0, u3_old - t * (B3 - sum{i in I} c[i]*x[i])/norma);
+  
+  printf"\n Updated multipliers %g,%g,%g and step %g \n", u1,u2,u3,t> results.txt;
+       
+}
+let toc := _ampl_user_time + _total_solve_user_time;
+
+let LR_time := toc - tic;
+let tic := toc;
+
+printf"\n\n\n">results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 Surrogate Relaxation	                            \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+# Initialize the surrogate relaxation
+
+param LB_SR default 0;
+display LB_SR > results.txt;
+
+param UB_SR default sum{i in I}p[i];
+display UB_SR > results.txt;
+
+let t:=1;
+
+for {iter in 1..MAXITER} 
+{
+  printf"\nIteration %d ... \n",iter > results.txt;
+   
+  solve SurrogateRelaxation;
+
+  # Check for feasibility
+  if ( (sum {i in I} w[i]*x[i] <= B1) && (sum {i in I} q[i]*x[i] <= B2) && (sum {i in I} c[i]*x[i] <= B3) ) then 
+  {
+    # Update lower bound 
+  	let LB_SR := max(LB_SR, sum{i in I} p[i]*x[i]);
+  	printf"\n Feasible solution found - value: %g", LB_SR > results.txt;
+  
+  }
+ 
+  # Update step size
+    let t := 0.995*t;
+ 
+  # Update upper bound
+  let UB_SR := min(UB_SR, OverallProfit);
+  printf"\n Current best upper bound %g",UB_SR > results.txt;
+   
+
+  # Update multipliers
+  let m1_old := m1;
+  let m2_old := m2;
+  let m3_old := m3;
+
+  let m1 := max(0, m1_old - t * (B1 - sum{i in I} w[i]*x[i]));
+  let m2 := max(0, m2_old - t * (B2 - sum{i in I} q[i]*x[i]));
+  let m3 := max(0, m3_old - t * (B3 - sum{i in I} c[i]*x[i]));
+
+
+  
+  printf"\n Updated multipliers %g,%g,%g and step %g \n", u1,u2,u3,t> results.txt;
+  
+  
+  if(LB_SR == UB_SR) then break;
+  
+}
+let toc := _ampl_user_time + _total_solve_user_time;
+
+let SR_time := toc - tic;
+let tic := toc;
+
+printf"\n\n\n">results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			 	Greedy					    \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+# Set of items to choose from 
+set J default I;
+
+# Set of current best items based on profit
+set bestItems default {};
+
+# Residual weight capacity
+param resB1 default B1;
+# Residual volume capacity
+param resB2 default B2;
+# Residual budget
+param resB3 default B3;
+
+param greedyValue default 0;
+
+repeat{
+   
+    let bestItems := {i in J: p[i] == max{u in J} p[u]};
+   
+    let J := J diff bestItems;
+ 
+    for{i in bestItems}
+    {	
+    	#add current best item to the greedy solution if there is enough capacity	
+		if( (resB1 >= w[i]) && (resB2 >=q[i]) && (resB3 >= c[i]) ) then 
+		{
+			let greedyValue := greedyValue + p[i];
+			let resB1 := resB1 - w[i];
+			let resB2 := resB2 - q[i];
+			let resB3 := resB3 - c[i];
+			let selectedItems := selectedItems union {i};
+		}
+	}	
+	
+} while(card(J) > 0);
+
+printf "\n Greedy solution %g", greedyValue > results.txt;
+
+let toc := _ampl_user_time + _total_solve_user_time;
+
+let greedy_time := toc - tic;
+let tic := toc;
+
+printf"\n\n\n">results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			     k-opt Neighborhood				    \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+param best_k_opt default 0;
+
+param flag default 1;
+
+param k_opt_iter;
+
+let best_k_opt := greedyValue;
+
+let k:=ceil(n/5);
+
+let k_opt_iter := 0;
+repeat{
+	
+	let k_opt_iter := k_opt_iter + 1;
+		
+	solve kOptNeighborhood;
+	
+	if(OverallProfit > best_k_opt) then
+	{
+	
+		# Update current best feasible solution
+		let selectedItems := {};			
+		for{i in I}
+		{
+			if(x[i] == 1) then 
+				let selectedItems := selectedItems union {i};
+		}		
+		let best_k_opt:= OverallProfit;
+		printf"\n Improving solution found - value: %g", best_k_opt > results.txt;
+		
+		
+	}
+	else
+	{
+		let flag:=0;
+	}
+		
+} while (flag = 1);
+
+let toc := _ampl_user_time + _total_solve_user_time;
+
+let kopt_time := toc - tic;
+
+printf"\n Best k opt solution %g", best_k_opt >results.txt;
+printf"\n number of iterations %d, time %g",k_opt_iter, kopt_time >results.txt;
+
+
+printf"\n\n\n">results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"  			  Continuous Relaxation				    \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+
+param UB_CR default sum{i in I}p[i];
+problem OriginalKnapsack;
+option relax_integrality 1;
+solve OriginalKnapsack;
+let UB_CR:=OverallProfit;
+display UB_CR > results.txt;
+
+
+
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"		                    Summary of results			  	    \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+printf"Lower bounds:\n\n" > results.txt;
+display LB_LR > results.txt;
+display LB_SR > results.txt;
+display greedyValue > results.txt;
+display best_k_opt > results.txt;
+
+printf"\n \n \n" > results.txt;
+
+printf"Upper bounds:\n\n" > results.txt;
+display UB_LR > results.txt;
+display UB_SR > results.txt;
+display UB_CR > results.txt;
+
+
+printf"\n\n LR - UB %g - LB %g - time %g", UB_LR, LB_LR, LR_time >results.txt;
+printf"\n\n SR - UB %g - LB %g - time %g", UB_SR, LB_SR, SR_time >results.txt;
+printf"\n\n greedy - LB %g - time %g", greedyValue, greedy_time >results.txt;
+printf"\n\n k-opt -  LB %g - time %g", best_k_opt, kopt_time >results.txt;

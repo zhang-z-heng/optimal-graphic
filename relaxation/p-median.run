@@ -1,0 +1,77 @@
+
+reset;
+
+model p-median.mod;
+data p-median-2.dat;
+
+option solver 'cplex';
+
+problem original: x,y,Cost,Assign,Pconstraint,Link;
+problem PDual1: x, y, Dual1, Pconstraint, Link;
+problem PDual2: x, y, Dual2, Assign, Pconstraint;
+
+param UB default sum{i in I, j in J} g[i,j];
+
+
+# First lagrangian relaxation
+param LB1 default 0;
+for {ii in 1..2000} {
+  let {i in I} c[i] := sum {j in J} (g[i,j]+uk[j]);
+
+  solve PDual1;
+
+  # Check for feasibility
+  if forall {j in J} (sum{i in I} x[i,j] = 1) then {
+    printf "UB %.3f\n", sum {i in I, j in J} g[i,j]*x[i,j];
+    if(sum {i in I, j in J} g[i,j]*x[i,j] < UB) then let UB := sum {i in I, j in J} g[i,j]*x[i,j];
+    break;
+  }
+
+  # Update step size
+  if LB1 > Dual1 + 0.01 then
+   # let t := 0.995*t;
+   let t:=(2/(ii));
+
+  # Update lower bound
+  let LB1 := max(LB1, Dual1);  
+
+  # Update multipliers
+  let {j in J} u0[j] := uk[j];
+  let {j in J} uk[j] := max(0, u0[j] + t * (1 - sum{i in I} x[i,j]));
+
+  printf "LB first lagrangian %.5f %.3f %d, UB %f\n", LB1, t, ii, UB;
+}
+
+# Second lagrangian relaxation
+param LB2 default 0;
+let t := 3;
+for {ii in 1..2000} {
+
+  solve PDual2;
+
+  # Check for feasibility
+  if forall {i in I, j in J} (x[i,j] <= y[i]) then {
+    printf "UB %.3f\n", sum {i in I, j in J} g[i,j]*x[i,j];
+    if(sum {i in I, j in J} g[i,j]*x[i,j] < UB) then let UB := sum {i in I, j in J} g[i,j]*x[i,j];
+    break;
+  }
+
+  # Update step size
+  if LB2 > Dual2 + 0.01 then
+   # let t := 0.995*t;
+   let t:=(2/(ii));
+
+  # Update lower bound
+  let LB2 := max(LB2, Dual2);  
+
+  # Update multipliers
+  let {i in I, j in J} lambda0[i,j] := lambda[i,j];
+  let {i in I, j in J} lambda[i,j] := max(0, lambda0[i,j] + t * (x[i,j]-y[i]));
+
+  printf "LB %.5f %.3f %d UB %f\n", LB2, t, ii, UB;
+}
+
+
+solve original;
+
+printf"\n\n first LB %f, second LB %f, best UB %f optimal %f \n", LB1, LB2, UB, Cost;
