@@ -1,0 +1,54 @@
+
+reset;
+
+model p-median-heuristic.mod;
+data p-median-1.dat;
+
+
+#-------------------------------------------------
+# 		CONTINUOUS RELAXATION
+#-------------------------------------------------
+
+option solver cplex;
+option cplex_options 'relax integrality=0';
+problem CR: x, y, Cost, Assign, Pconstraint, Link;
+solve CR;
+
+printf"\n" > results.txt; 
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   CONTINUOUS RELAXATION \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+printf"\n Cost: %f \n", Cost > results.txt;
+printf"\n" > results.txt;
+
+printf"\n\n Amount of time to solve the continuous relaxation to optimality: %f seconds \n\n", _solve_time > results.txt;
+
+
+reset options;
+
+
+#-------------------------------------------------
+# 		GREEDY ALGORITHM
+#-------------------------------------------------
+include p-median-greedy.run;
+
+
+# auxiliary parameter for the stopping criterion of
+# the local search and the k-opt neighborhood 
+param flag default 1;
+
+
+#-------------------------------------------------
+# 		LOCAL SEARCH
+#-------------------------------------------------
+include p-median-local-search.run;
+
+
+#-------------------------------------------------
+# 		K-OPT NEIGHBORHOOD
+#-------------------------------------------------
+include p-median-k-opt.run;
+
+

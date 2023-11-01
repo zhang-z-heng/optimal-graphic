@@ -1,0 +1,75 @@
+
+let k:=20;
+
+# set the initial solution to the solution provided by the greedy algorithm
+let SOL := PI;
+let PAIRSOL := PJ;
+let best_cost := sum{(i,j) in PJ} g[i,j];
+
+problem kOpt: x, y, Cost, Assign, Pconstraint, Link, size;
+option solver cplex;
+option cplex_options 'timelimit=600'; # in seconds
+
+#param iter default 0;
+param tic_k_opt default 0;
+param toc_k_opt default 0;
+
+#printf"\n\n Initial solution objective function value: %f\n\n", best_cost;
+
+let tic_k_opt := _ampl_elapsed_time;
+
+param koptImprovements default 0;
+
+repeat {
+
+	#let iter := iter + 1;
+   
+	# solve the k-opt neighborhood problem 
+	solve kOpt;
+      	
+	# if cplex returned a feasible or optimal solution 
+	# (must be checked by means of the solve code due to the time limit)
+	# and this solution is better than the current one, update the current solution otherwise set the stopping criterion	
+	if ((solve_result_num in {0,2,3,422}) && (Cost < best_cost)) then 
+	{
+		let best_cost := Cost;
+		let SOL := {i in I: y[i] = 1};
+		let PAIRSOL := {i in I, j in J: x[i,j] = 1};
+		
+		let koptImprovements := koptImprovements+1;
+      	
+		#printf"\n Objective function value improvement in iteration %d: %f \n", iter, Cost;			
+	} 
+	else 
+	{
+		let flag := 0;
+	};
+   
+} while ( flag = 1 );
+
+let toc_k_opt := _ampl_elapsed_time;
+
+
+printf"\n" > results.txt; 
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   K-OPT NEIGHBORHOOD \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt;
+
+printf" k value: %d \n", k> results.txt;
+printf" Selected facilities: \t"> results.txt;
+for{i in SOL} 
+{
+	printf "%d \t", i > results.txt;
+}
+printf"\n Selected assignment:\n" >results.txt;
+for{(i,j) in  PAIRSOL}
+{
+	printf" %d -> %d\t", j, i > results.txt;
+}
+printf"\n Cost: %f", sum{(i,j) in PAIRSOL} g[i,j] > results.txt;
+
+printf"\n\n Amount of time to execute the k-opt procedure: %f seconds \n\n", (toc_k_opt - tic_k_opt) > results.txt;
+
+printf"\n Number of improvements %d\n", koptImprovements >results.txt;
+

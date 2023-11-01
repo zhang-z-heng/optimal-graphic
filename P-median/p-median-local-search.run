@@ -1,0 +1,101 @@
+
+# set the initial solution to the solution provided by the greedy algorithm
+let SOL := PI;
+let PAIRSOL := PJ;
+let best_cost := sum{(i,j) in PJ} g[i,j];
+
+set newSOL within I;
+set newPAIRSOL within I cross J;
+
+#display SOL;
+#printf"\n";
+#display I diff SOL;
+#printf"\n";
+
+param tic_local_search default 0;
+param toc_local_search default 0;
+
+let tic_local_search := _ampl_elapsed_time;
+
+param improvements default 0;
+
+repeat
+{
+   
+	let flag:= 0;
+   
+   	for{i in SOL, j in I diff SOL}
+   	{
+
+		#display i;
+		#display j;
+		
+		# change the set of facilities
+		let newSOL := SOL;
+		let newSOL := newSOL diff {i};
+		let newSOL := newSOL union {j};
+		let newPAIRSOL := {};
+				
+		# reassign the customers  			
+  		for {jj in J} 
+  		{  		  		
+  		  	let a_ij := max{ii in newSOL} g[ii,jj];  		  	
+  		  	  		  	  		  	
+  			for {ii in newSOL}
+  			{
+          			if (g[ii,jj] <= a_ij) then 
+          			{
+            				let si := ii;
+             				let a_ij := g[ii,jj];
+          			}			
+        		}
+
+
+			let newPAIRSOL := newPAIRSOL union {(si,jj)};
+    		}
+        	             
+        	#display best_cost;
+     		#display sum{(ii,jj) in newPAIRSOL} g[ii,jj];
+     		#display newSOL;
+ 		#display newPAIRSOL;
+     
+     		# check if the new (neighbor) solution has lower cost than the current solution
+     		if (sum{(ii,jj) in newPAIRSOL} g[ii,jj] < best_cost) then
+     		{     		
+     			let flag := 1;
+     			let SOL:= newSOL;
+     			let PAIRSOL := newPAIRSOL;
+     			let best_cost := sum{(ii,jj) in newPAIRSOL} g[ii,jj];
+				let improvements := improvements +1;
+     			break; #end search for an improving neighbor
+     		}
+     	
+	}
+	
+ } while ( flag = 1 );
+
+let toc_local_search := _ampl_elapsed_time;
+
+
+printf"\n" > results.txt; 
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"                		   LOCAL SEARCH \n" > results.txt;
+printf"-----------------------------------------------------------------------------\n" > results.txt;
+printf"\n" > results.txt; 
+
+printf" Selected facilities: \t"> results.txt;
+for{i in SOL}
+{
+	printf "%d \t", i > results.txt;
+}
+printf"\n Selected assignment:\n" >results.txt;
+for{(i,j) in  PAIRSOL}
+{
+	printf" %d -> %d\t", j, i > results.txt;
+}
+printf"\n Cost: %f", sum{(i,j) in PAIRSOL} g[i,j] > results.txt;
+
+printf"\n\n Amount of time to execute the local search procedure: %f seconds \n\n", (toc_local_search - tic_local_search) > results.txt;
+printf"\n Number of improvements %d\n", improvements >results.txt;
+
+
