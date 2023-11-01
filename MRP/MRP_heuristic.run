@@ -1,0 +1,129 @@
+reset;
+# Select an ILP solver
+option solver cplex;
+
+model MRP_heuristic.mod;
+data MRP_10.dat;
+# Define the LP relaxation
+problem SetCover: x, WeightedCover, EdgeCover;
+
+#current partial solution
+let C := {};
+# next vertex to be selected
+param v default first(P);
+#random parameter
+param r default 0;
+param cost default 0;
+param continuousRel default 0;
+param randRound default 0;
+# best solution found so far
+param best_cost default 0;
+
+ display card(U);
+  solve SetCover;
+  display x;
+  # add to the partial solution all the nodes whose continuous variable is equal to 1
+  let C := setof {i in N: x[i] = 1} i;
+  display C;
+  for{ i in N}
+      let continuousRel:= continuousRel + c[i]*x[i];
+	display continuousRel;
+
+   let P := setof {i in N: 0 < x[i] < 1} i;
+
+repeat {
+   # Solve the LP relaxation
+   solve SetCover;
+display x;
+display C;
+   display WeightedCover;
+   # Put in the cover the vertices with x^*=1
+   let C := C union {setof {i in N: x[i] = 1} i};
+   # Put in P the vertices with x^* fractionary
+   let P := setof {i in N: 0 < x[i] < 1} i;
+   repeat{
+   	if card(P) = 0 then break;
+	# select a random vertex v in P
+   	let v := member(int(Uniform(1,card(P))),P);
+	# remove it from P
+   	let P := P diff {v};
+	# generate a random value r between 0 and 1 
+   	let r := Uniform(0,1);
+   	#printf "Vertex %d prob %f x %f\n", v, r, x[v];
+	# add vertex v to the solution if x^*[v] > r
+   	if r <= x[v] then {
+      		let C := C union {v};
+      		printf "  selected %d\n", v;	
+   	} 
+   }while (card(P) > 0);
+   fix {i in C} x[i] := 1;
+	display card(U);
+	display card(C);
+} while (card(U) > 1 );
+
+   fix {i in C} x[i] := 1;
+   for{i in C} let cost := cost + c[i];
+
+
+if card(U) == 1 then {
+   for {(i,j) in U}
+     let C := C union {i};
+}
+
+display card(C);
+let cost := 0;
+   for{i in C} let cost := cost + c[i];
+
+display C;
+
+printf"\n Continuous relaxation %f\n", continuousRel;
+let randRound := cost;
+printf"\n Integer solution %f\n", cost;
+if card(U) > 1 then printf "\n Unfeasible\n";
+
+
+problem VLSN: x_LS, WeightedCover_LS, EdgeCover_LS, VLSN_size;
+
+  printf "\n---------VLSN---------------------------------------------\n";
+
+option cplex_options 'nodelim 1000';
+
+# set the initial solution equal to the solution obtained by the randomized rounding
+let SOL := C;
+display SOL;
+# compute the initial value
+let best_cost := sum{i in C}c[i];
+
+printf "\n Initial value %d\n", best_cost;
+let k_size := int(card(SOL)/1);
+#let k_size := int(card(N)/1);
+display k_size;
+
+# number of iterations
+param iter default 0;
+# stopping criterio 
+param flag default 1;
+
+repeat {
+   let iter := iter + 1;
+   #solve the problem associated with VLSN
+   solve VLSN;
+   # if there is an improving solution, update the current solution
+   # otherwise set the stopping criterion	
+   if (WeightedCover_LS < best_cost) then {
+      let best_cost := WeightedCover_LS;
+      let SOL := {i in N: x_LS[i] = 1};
+	printf"\n improvement in iteration  %d, value %f\n", iter, WeightedCover_LS;
+   } 
+   else {let flag :=0};
+} while ( flag = 1 );
+printf"\n\n";
+display card(SOL), sum {k in SOL} c[k], best_cost;
+
+printf"\nVLSN solution : objective function %f",sum{k in SOL}c[k];
+printf"\n solution :";
+for{k in SOL} printf"%d ",k;
+printf"\n";
+
+printf"\n LB %f; first UB %f; final UB %f", continuousRel, randRound, best_cost;
+printf"  CPU time %g\n", _ampl_elapsed_time;
