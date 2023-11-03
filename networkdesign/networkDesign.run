@@ -1,0 +1,103 @@
+option solver cplex;
+
+reset;
+
+model parameterDefinition.mod;
+model networkDesign.mod;
+
+data networkDesign_1.dat;
+
+
+problem continuous:  x, y, ND_cost, flow_balancing, arc_capacity; 
+
+problem continuous_1:  x, y, ND_cost, flow_balancing, arc_capacity, enriched_1;
+
+problem continuous_2:  x, y, ND_cost, flow_balancing, arc_capacity, enriched_2;
+
+problem continuous_1_2:  x, y, ND_cost, flow_balancing, arc_capacity, enriched_1, enriched_2;
+
+problem original:  x_I, y_I, ND_cost_I, flow_balancing_I, arc_capacity_I; 
+
+
+
+
+
+
+param fob_I;
+param fob_C;
+param fob_C_F;
+param time_I;
+param time_C;
+param flag default 1;
+
+
+problem original;
+option solver 'cplex';
+
+option cplex_options 'timelimit=600 timing 1 threads=1 treememlim=1000';
+
+solve original;
+
+let fob_I := ND_cost_I;
+let time_I := _solve_time;
+
+
+
+problem continuous;
+option solver 'cplex';
+
+option cplex_options 'timelimit=600 timing 1 threads=1 treememlim=1000';
+
+solve continuous;
+
+
+
+let fob_C := ND_cost;
+let time_C := _solve_time;
+
+printf"\n integer: fob %f, time %f \n CR: fob %f, time %f; gap %f \n", fob_I, time_I, fob_C, time_C, 100*(fob_I-fob_C)/fob_I>results.txt;
+
+
+
+problem continuous_1;
+option solver cplex;
+
+option cplex_options 'timelimit=600 timing 1 threads=1 treememlim=1000';
+
+solve continuous_1;
+
+
+let fob_C_F := ND_cost;
+let time_C := _solve_time;
+
+
+
+printf"\n original: fob %f, time %f \n CR: I fob %f, time %f; gap %f; A1 fob %f, time %f; gap %f  \n", 
+fob_I, time_I, fob_C, time_C, 100*(fob_I-fob_C)/fob_I, fob_C_F, time_C, 100*(fob_I-fob_C_F)/fob_I>results.txt;
+
+
+problem continuous_2;
+option solver cplex;
+
+option cplex_options 'timelimit=600 timing 1 threads=1 treememlim=1000';
+
+solve continuous_2;
+
+
+let fob_C_F := ND_cost;
+let time_C := _solve_time;
+
+printf"\n CR: A2 fob %f, time %f gap %f  \n",  fob_C_F, time_C, 100*(fob_I-fob_C_F)/fob_I>results.txt;
+
+problem continuous_1_2;
+option solver cplex;
+
+option cplex_options 'timelimit=600 timing 1 threads=1 treememlim=1000';
+
+solve continuous_1_2;
+
+
+let fob_C_F := ND_cost;
+let time_C := _solve_time;
+
+printf"\n CR: A3 fob %f, time %f; gap %f  \n",  fob_C_F, time_C, 100*(fob_I-fob_C_F)/fob_I>results.txt;
